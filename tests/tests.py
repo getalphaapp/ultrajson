@@ -274,6 +274,26 @@ class UltraJSONTests(unittest.TestCase):
         self.assertEqual(input, ujson.decode(output))
         self.assertEqual(input, ujson.decode(output))
 
+    def test_encodeDictRefCounting(self):
+        class _DeleteTracker(object):
+            def __init__(self, del_container):
+                self._del_container = del_container
+
+            def __del__(self):
+                self._del_container[0] = True
+
+            @staticmethod
+            def __json__():
+                return "_DeleteTracker()"
+
+        instance_deleted = [False]
+        output = ujson.encode({"k1": _DeleteTracker(instance_deleted)})
+        self.assertEqual(output, '{"k1":_DeleteTracker()}')
+        # Ensure the _DeleteTracker instance was deleted, since it should not
+        # be stored in any namespace once `encode` returns.
+        self.assertTrue(instance_deleted[0],
+                        "encode has leaked a value in the dictionary")
+
     def test_encodeNoneConversion(self):
         input = None
         output = ujson.encode(input)
